@@ -1,18 +1,3 @@
-/**
- * FRESH FRUIT - MONITORAMENTO ESPECTRAL E MATURAÇÃO DE FRUTAS
- * FIAP - GLOBAL SOLUTION 2026.2 - CITIZENTECH
- *
- * Integrantes:
- * - Guilherme Pereira Ruiz (RM: 554823)
- * - Henrique Matielo (RM: 558110)
- * - Gabriel Dias (RM: 556672)
- * - Eduardo Ramos (RM: 555021)
- *
- * Firmware ESP32 com processamento local para simulação de espectrometria
- * Vis-NIR (18 canais AS7265x), proxies de clorofila, sólidos solúveis, umidade,
- * índice de maturação e vida útil estimada para 7 frutas. Alertas por LED RGB,
- * buzzer e LCD 16x2 I2C, telemetria serial e envio HTTP ao backend FastAPI.
- */
 
 #include <WiFi.h>
 #include <HTTPClient.h>
