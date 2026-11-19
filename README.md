@@ -144,39 +144,152 @@ O firmware opera sob máquina de estados não-bloqueante controlada por `millis(
 
 ## 🚀 7. Como Executar e Testar o Projeto
 
-### Pré-requisitos
-- Python 3.10+ instalado no computador.
-- Navegador Web moderno (Chrome, Edge ou Firefox).
-- Visual Studio Code com a extensão Wokwi (ou simulador Wokwi Web).
+O Fresh Fruit utiliza o **Wokwi Simulator integrado ao Visual Studio Code** para simular o circuito eletrônico com ESP32. O backend é executado localmente por meio do FastAPI, enquanto o Dashboard Web consome os dados disponibilizados pela API.
 
-### Passo 1: Iniciar o Backend FastAPI
-1. Abra um terminal na pasta `backend/`:
-   ```powershell
-   cd backend
-   ```
-2. Instale as dependências:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-3. Inicie o servidor Uvicorn:
-   ```powershell
-   uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-   ```
-4. Verifique a documentação Swagger interativa em: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+### 7.1. Pré-requisitos
 
-### Passo 2: Abrir o Dashboard Web
-- Abra o arquivo `dashboard/index.html` diretamente em seu navegador (ou via Live Server).
-- O indicador de status no topo deverá exibir **"Backend Conectado (FastAPI)"** em verde.
+Antes de iniciar, certifique-se de possuir:
 
-### Passo 3: Executar a Simulação no Wokwi
-1. Abra o arquivo `diagram.json` e `sketch.ino` no Wokwi.
-2. Inicie a simulação (botão Play).
-3. No Teclado Matricial, pressione `1` (Banana) e em seguida `#` (Confirmar).
-4. Gire o potenciômetro para simular diferentes graus de maturação:
-   - **Giro baixo (~20%):** Estado de Atenção (Verde/Imaturo) &bull; LED Amarelo.
-   - **Giro médio (~60%):** Estado Normal (Maduro/Ideal) &bull; LED Verde.
-   - **Giro alto (~95%):** Estado Crítico (Passado/Deteriorado) &bull; LED Vermelho + Buzzer.
-5. Observe as informações sendo enviadas ao Backend e exibidas em tempo real no Dashboard Web!
+- [Visual Studio Code](https://code.visualstudio.com/) instalado.
+- Extensão **Wokwi for VS Code** instalada e configurada.
+- Python 3.10 ou superior.
+- Navegador Web atualizado (Chrome, Edge ou Firefox).
+- Projeto Fresh Fruit clonado ou baixado do GitHub.
+
+**Repositório:** https://github.com/gprsilva/FreshFruit
+
+### 7.2. Passo 1 — Abrir o projeto no Visual Studio Code
+
+1. Clone o repositório:
+
+   ```bash
+   git clone https://github.com/gprsilva/FreshFruit.git
+   ```
+
+2. Abra a pasta `FreshFruit` no Visual Studio Code.
+3. Confira se os arquivos `diagram.json`, `sketch.ino` e `wokwi.toml` estão na raiz do projeto.
+
+O arquivo `wokwi.toml` contém as configurações utilizadas pela extensão para localizar o firmware compilado e iniciar a simulação.
+
+### 7.3. Passo 2 — Instalar as dependências do Backend
+
+Abra um terminal integrado no Visual Studio Code, certificando-se de que o diretório atual seja a raiz do projeto `FreshFruit`.
+
+Execute:
+
+```bash
+python -m pip install -r backend/requirements.txt
+```
+
+Esse comando instala as dependências necessárias para executar a API, incluindo FastAPI, Uvicorn e Pydantic.
+
+### 7.4. Passo 3 — Iniciar o servidor FastAPI
+
+Ainda na raiz do projeto, execute:
+
+```bash
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+**Importante:** o comando deve ser executado na raiz do repositório, e não dentro da pasta `backend/`, pois a aplicação utiliza imports relativos entre os módulos.
+
+Após a inicialização, o terminal deverá indicar que o servidor está disponível em:
+
+```text
+http://127.0.0.1:8000
+```
+
+Para verificar se o backend está funcionando, abra no navegador:
+
+- **Health Check:** http://127.0.0.1:8000/health
+- **Documentação interativa:** http://127.0.0.1:8000/docs
+
+O endpoint `/health` deverá retornar informações sobre o estado do serviço e a conexão com o banco SQLite.
+
+**Mantenha esse terminal aberto durante os testes**, pois ele mantém o servidor em execução.
+
+### 7.5. Passo 4 — Abrir o Dashboard Web
+
+Com o backend em execução:
+
+1. Abra a pasta `dashboard/` no explorador de arquivos do projeto.
+2. Abra o arquivo `index.html` diretamente no navegador ou utilize a extensão Live Server do VS Code.
+3. Verifique o indicador de conexão com o backend.
+
+Quando a comunicação estiver funcionando, o Dashboard deverá apresentar o status de backend conectado.
+
+O Dashboard consulta periodicamente a API para atualizar os indicadores e o histórico de medições.
+
+### 7.6. Passo 5 — Testar o Backend e o Dashboard
+
+Antes de iniciar a simulação do ESP32, é possível verificar a integração entre o backend e o dashboard utilizando o simulador de leituras disponível na própria interface.
+
+1. No Dashboard, localize a opção de simulação de leitura.
+2. Escolha uma fruta.
+3. Selecione um estágio de maturação.
+4. Envie a leitura.
+5. Observe a atualização dos indicadores, do gráfico espectral e do histórico.
+
+Essa etapa permite validar o recebimento, a persistência e a apresentação dos dados pela API, independentemente da conexão com o ESP32.
+
+### 7.7. Passo 6 — Executar a simulação do ESP32 no Wokwi
+
+Com o projeto aberto no Visual Studio Code:
+
+1. Abra o arquivo `diagram.json`.
+2. Certifique-se de que os arquivos de firmware indicados no `wokwi.toml` estejam disponíveis:
+   - `sketch.ino.bin`
+   - `sketch.ino.elf`
+3. Pressione `F1` ou `Ctrl + Shift + P`.
+4. Procure o comando **Wokwi: Start Simulator**.
+5. Inicie a simulação.
+6. Abra o monitor serial para acompanhar as mensagens do ESP32.
+
+O simulador deverá carregar o circuito com ESP32, teclado matricial, potenciômetro, display LCD, LED RGB e buzzer.
+
+### 7.8. Passo 7 — Realizar os testes de maturação
+
+Com a simulação em execução:
+
+1. Pressione uma tecla de `1` a `7` para selecionar uma fruta.
+2. Pressione `#` para confirmar a seleção.
+3. Gire o potenciômetro para modificar o valor de entrada utilizado na simulação espectral.
+4. Observe as mudanças nos indicadores apresentados no LCD.
+5. Verifique as respostas do LED RGB e do buzzer.
+6. Acompanhe as informações e os estados registrados no monitor serial.
+
+Exemplo de seleção:
+
+| Tecla | Fruta |
+|---|---|
+| 1 | Banana |
+| 2 | Manga |
+| 3 | Mamão |
+| 4 | Maçã |
+| 5 | Uva |
+| 6 | Laranja |
+| 7 | Abacate |
+
+A tecla `*` cancela a seleção e retorna o dispositivo ao estado inicial.
+
+### 7.9. Integração e conectividade
+
+O ESP32 foi programado para tentar transmitir as leituras ao backend por HTTP, utilizando o endereço configurado no firmware.
+
+Quando a conexão está disponível, as informações podem ser enviadas à API e armazenadas no banco SQLite.
+
+Caso a conexão Wi-Fi ou a comunicação com o backend não esteja disponível, o dispositivo mantém seu processamento local, incluindo a classificação da maturação e os alertas visuais e sonoros.
+
+**Observação:** o simulador de leituras do Dashboard permite testar a API e a interface separadamente da transmissão do ESP32. Portanto, uma leitura gerada pelo simulador web não deve ser confundida com uma medição recebida diretamente do dispositivo.
+
+### 7.10. Encerramento
+
+Para finalizar os testes:
+
+1. Interrompa a simulação do Wokwi.
+2. Retorne ao terminal do backend.
+3. Pressione `Ctrl + C` para encerrar o servidor FastAPI.
+
 
 ---
 
