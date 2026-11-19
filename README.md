@@ -49,11 +49,26 @@ O sensor de referência AS7265x disponibiliza 18 canais ópticos distribuídos e
 `410, 435, 460, 485, 510, 535, 560, 585, 610, 645, 680, 705, 730, 760, 810, 860, 900, 940 nm`
 
 ### 2.2. Indicadores Calculados na Borda (ESP32)
-1. **Proxy de Clorofila:** Avalia a degradação da clorofila na casca através do ratio entre o pico de absorção em 680 nm e a banda de referência Red-Edge (730 nm).
-2. **Proxy de Sólidos Solúveis (°Brix Estimado):** Estima o acúmulo de açúcares naturais a partir de bandas de absorção NIR (810–860 nm).
-3. **Proxy de Umidade Relativa (%):** Monitora a perda de turgidez e conteúdo hídrico celular (bandas de 900–940 nm).
-4. **Índice Composto de Maturação (0% a 100%):** Ponderação matemática normalizada adaptada para cada fruta.
-5. **Estimativa Heurística de Vida Útil (em dias):** Dias restantes estimados até o limite de consumo ideal.
+
+No protótipo **não há sensor físico**: o **potenciômetro ligado ao GPIO 34 simula a reflectância espectral** que seria medida pelo AS7265x. **Todos os indicadores derivam desse único valor**, seguindo este fluxo:
+
+1. O ADC do ESP32 lê o potenciômetro (0 a 4095).
+2. Uma média móvel de 5 amostras suaviza a leitura (uma nova leitura a cada 400 ms).
+3. O valor suavizado é normalizado: `n = ADC / 4095`, onde `0` representa fruta verde e `1`, fruta passada.
+4. A partir de `n`, o firmware gera os 18 canais espectrais (assinatura espectral sintética) e calcula os cinco indicadores, ajustados à faixa de cada fruta.
+5. O índice de maturação é comparado aos limiares da fruta para definir o estágio e o estado (NORMAL, ATENÇÃO ou CRÍTICO).
+
+| Indicador | Banda de referência no sensor real | Cálculo no protótipo (`n = ADC / 4095`) |
+|---|---|---|
+| **Proxy de Clorofila** | Razão entre o pico de absorção em 680 nm e a banda Red-Edge (730 nm) | `clorofila_máx − n × (clorofila_máx − clorofila_mín)`; diminui conforme `n` aumenta |
+| **Proxy de Sólidos Solúveis (°Brix)** | Bandas NIR de 810 a 860 nm | `brix_mín + n × (brix_máx − brix_mín)` |
+| **Proxy de Umidade Relativa (%)** | Bandas de 900 a 940 nm | `88 − 22 × n` |
+| **Índice de Maturação (0% a 100%)** | Composição dos indicadores espectrais | `n × 100`; os limiares de classificação variam por fruta |
+| **Vida Útil Estimada (dias)** | Heurística sobre a maturação | `(1 − n) × vida_útil_máx` |
+
+As faixas de °Brix, clorofila e vida útil máxima de cada fruta estão na tabela da Seção 3.
+
+> **Importante:** neste protótipo os 18 canais gerados a partir de `n` servem para visualização no dashboard e para a transmissão ao backend; **eles não alimentam o cálculo dos indicadores**. Com um sensor AS7265x real, o caminho se inverte: os canais medidos passam a ser a entrada, e os indicadores são calculados a partir das razões entre as bandas indicadas na coluna "Banda de referência".
 
 > **⚠️ Limitação Científica:** Os indicadores são estimativas heurísticas demonstrativas educacionais. Em um produto comercial de campo, seriam necessárias calibrações laboratoriais com espectrofotômetros de bancada, controle rigoroso de iluminância e geometria de medição.
 
@@ -144,152 +159,157 @@ O firmware opera sob máquina de estados não-bloqueante controlada por `millis(
 
 ## 🚀 7. Como Executar e Testar o Projeto
 
-O Fresh Fruit utiliza o **Wokwi Simulator integrado ao Visual Studio Code** para simular o circuito eletrônico com ESP32. O backend é executado localmente por meio do FastAPI, enquanto o Dashboard Web consome os dados disponibilizados pela API.
+O Fresh Fruit tem três partes que rodam localmente: o **backend** (FastAPI), o **dashboard** (HTML/JS) e o **firmware** do ESP32, simulado com o **Wokwi para VS Code**. A ordem abaixo permite validar cada etapa antes de seguir para a próxima:
+
+| Etapa | O que faz | Como confirmar que funcionou |
+|---|---|---|
+| 1. Backend | Sobe a API e o banco SQLite | `/health` responde no navegador |
+| 2. Dashboard | Exibe os dados da API | Badge "Backend conectado" |
+| 3. Teste sem hardware | Envia uma leitura pelo simulador do dashboard | A leitura aparece no painel e no histórico |
+| 4. Firmware | Gera o binário que o Wokwi executa | Arquivo `.merged.bin` na pasta `build/` |
+| 5. Simulação | Roda o ESP32 virtual | Banner no monitor serial e mensagem no LCD |
+| 6. Integração | O ESP32 envia leituras ao backend | `[HTTP] Sucesso` no serial e leituras do `ESP32-FRESHFRUIT-01` no dashboard |
+
+> Para validar apenas a API e a interface, as etapas 1 a 3 bastam: elas não dependem do Wokwi.
 
 ### 7.1. Pré-requisitos
 
-Antes de iniciar, certifique-se de possuir:
+- [Visual Studio Code](https://code.visualstudio.com/) com a extensão **Wokwi for VS Code**. A extensão exige uma licença ativada: pressione `F1` e execute **Wokwi: Request a New License**.
+- **Python 3.10 ou superior** (`python --version` para conferir).
+- **Arduino IDE 2** com o pacote de placas **esp32 (Espressif Systems)**, necessário apenas para gerar o firmware (etapa 4).
+- Navegador atualizado (Chrome, Edge ou Firefox).
+- Git, para clonar o repositório.
 
-- [Visual Studio Code](https://code.visualstudio.com/) instalado.
-- Extensão **Wokwi for VS Code** instalada e configurada.
-- Python 3.10 ou superior.
-- Navegador Web atualizado (Chrome, Edge ou Firefox).
-- Projeto Fresh Fruit clonado ou baixado do GitHub.
+### 7.2. Obter o projeto
 
-**Repositório:** https://github.com/gprsilva/FreshFruit
+```bash
+git clone https://github.com/gprsilva/FreshFruit.git
+```
 
-### 7.2. Passo 1 — Abrir o projeto no Visual Studio Code
+Abra a pasta `FreshFruit` no VS Code (`File > Open Folder`). Ela deve ser a raiz do workspace, com `diagram.json`, `sketch.ino` e `wokwi.toml` visíveis no Explorer. Todos os comandos a seguir partem dessa raiz.
 
-1. Clone o repositório:
+### 7.3. Etapa 1: Backend (FastAPI)
+
+Abra um terminal no VS Code (`Ctrl + '`) na raiz do projeto.
+
+1. Instale as dependências:
 
    ```bash
-   git clone https://github.com/gprsilva/FreshFruit.git
+   python -m pip install -r backend/requirements.txt
    ```
 
-2. Abra a pasta `FreshFruit` no Visual Studio Code.
-3. Confira se os arquivos `diagram.json`, `sketch.ino` e `wokwi.toml` estão na raiz do projeto.
+2. Crie o arquivo de ambiente a partir do exemplo:
 
-O arquivo `wokwi.toml` contém as configurações utilizadas pela extensão para localizar o firmware compilado e iniciar a simulação.
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
 
-### 7.3. Passo 2 — Instalar as dependências do Backend
+   A chave de API (`x-api-key`) deve ser a mesma no backend, no `sketch.ino` e no `dashboard/app.js`. Se alterar o valor no `.env` (veja os nomes das variáveis em `.env.example`), atualize os outros dois arquivos.
 
-Abra um terminal integrado no Visual Studio Code, certificando-se de que o diretório atual seja a raiz do projeto `FreshFruit`.
+3. Inicie o servidor:
 
-Execute:
+   ```bash
+   python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+   Execute **na raiz do repositório**, e não dentro de `backend/`: os módulos usam imports relativos e, de dentro da pasta, o Python falha com `ImportError: attempted relative import with no known parent package`.
+
+**Resultado esperado:** o terminal mostra `Uvicorn running on http://127.0.0.1:8000`, e `http://127.0.0.1:8000/health` responde no navegador. A documentação interativa fica em `http://127.0.0.1:8000/docs`.
+
+Mantenha esse terminal aberto durante todos os testes.
+
+### 7.4. Etapa 2: Dashboard
+
+Abra um **segundo terminal** na raiz do projeto e sirva a pasta do dashboard:
 
 ```bash
-python -m pip install -r backend/requirements.txt
+python -m http.server 5500 --directory dashboard
 ```
 
-Esse comando instala as dependências necessárias para executar a API, incluindo FastAPI, Uvicorn e Pydantic.
+Acesse `http://127.0.0.1:5500`. Alternativa: clique com o botão direito em `dashboard/index.html` e escolha **Open with Live Server**, caso a extensão esteja instalada.
 
-### 7.4. Passo 3 — Iniciar o servidor FastAPI
+**Resultado esperado:** o badge no topo mostra **Backend conectado**. Se mostrar "Backend desconectado", confirme que a etapa 1 está rodando na porta 8000 (o endereço usado pelo dashboard é a constante `API_BASE_URL` no início do `app.js`).
 
-Ainda na raiz do projeto, execute:
+### 7.5. Etapa 3: Testar API e dashboard sem o ESP32
 
-```bash
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
-```
+1. No dashboard, clique em **Simular leitura**.
+2. Escolha uma fruta e um estágio de maturação.
+3. Clique em **Enviar leitura**.
 
-**Importante:** o comando deve ser executado na raiz do repositório, e não dentro da pasta `backend/`, pois a aplicação utiliza imports relativos entre os módulos.
+**Resultado esperado:** o painel principal, o gráfico espectral e o histórico são atualizados, com o dispositivo `SIMULADOR-WEB-01`. Isso confirma que a API recebe, grava no SQLite e devolve os dados, independentemente do ESP32.
 
-Após a inicialização, o terminal deverá indicar que o servidor está disponível em:
+### 7.6. Etapa 4: Gerar o firmware
 
-```text
-http://127.0.0.1:8000
-```
+A extensão do Wokwi para VS Code **não compila o código**: ela executa um binário já compilado. Se a pasta `build/` já estiver no repositório e você não alterou o `sketch.ino`, pule para a etapa 5. Caso contrário, gere o binário:
 
-Para verificar se o backend está funcionando, abra no navegador:
+1. No Arduino IDE 2, instale as bibliotecas em `Tools > Manage Libraries`: **LiquidCrystal I2C**, **Keypad** e **ArduinoJson**.
+2. Abra o `sketch.ino` e selecione a placa em `Tools > Board > esp32`: **ESP32 Dev Module**.
+3. Execute `Sketch > Export Compiled Binary`.
 
-- **Health Check:** http://127.0.0.1:8000/health
-- **Documentação interativa:** http://127.0.0.1:8000/docs
+   O Arduino IDE exige que o sketch esteja numa pasta com o mesmo nome do arquivo. Se ele oferecer criar a pasta `sketch/`, aceite e, depois da exportação, copie a pasta `build/` gerada para a raiz do projeto (ou ajuste os caminhos abaixo).
 
-O endpoint `/health` deverá retornar informações sobre o estado do serviço e a conexão com o banco SQLite.
+4. Confira os arquivos gerados em `build/esp32.esp32.esp32/`: `sketch.ino.bin`, `sketch.ino.merged.bin` e `sketch.ino.elf`.
+5. Aponte o `wokwi.toml` para o binário **merged**, que inclui bootloader e tabela de partições:
 
-**Mantenha esse terminal aberto durante os testes**, pois ele mantém o servidor em execução.
+   ```toml
+   [wokwi]
+   version = 1
+   firmware = "build/esp32.esp32.esp32/sketch.ino.merged.bin"
+   elf = "build/esp32.esp32.esp32/sketch.ino.elf"
+   ```
 
-### 7.5. Passo 4 — Abrir o Dashboard Web
+   Os caminhos são relativos à pasta do `wokwi.toml`. O `libraries.txt` serve ao editor online (wokwi.com) e não é usado pela extensão do VS Code.
 
-Com o backend em execução:
+### 7.7. Etapa 5: Executar a simulação no Wokwi
 
-1. Abra a pasta `dashboard/` no explorador de arquivos do projeto.
-2. Abra o arquivo `index.html` diretamente no navegador ou utilize a extensão Live Server do VS Code.
-3. Verifique o indicador de conexão com o backend.
+1. Abra o `diagram.json`.
+2. Pressione `F1` e execute **Wokwi: Start Simulator**.
+3. Abra o monitor serial da simulação para acompanhar as mensagens.
 
-Quando a comunicação estiver funcionando, o Dashboard deverá apresentar o status de backend conectado.
+**Resultado esperado:** o monitor serial exibe o banner "FRESH FRUIT" com a lista de integrantes, o LCD mostra "FRESH FRUIT / GS 2026.2 FIAP" e depois "Selecione Fruta: 1..7 e tecle #", e o LED RGB fica azul (estado IDLE).
 
-O Dashboard consulta periodicamente a API para atualizar os indicadores e o histórico de medições.
+### 7.8. Teste de maturação
 
-### 7.6. Passo 5 — Testar o Backend e o Dashboard
+1. Pressione uma tecla de `1` a `7` para escolher a fruta (a tabela da Seção 3 mostra o mapeamento).
+2. Pressione `#` para confirmar.
+3. Ajuste o potenciômetro: como ele simula a reflectância espectral (Seção 2.2), valores mais altos representam frutas mais maduras.
+4. Observe o LCD (alterna entre maturação/estado e °Brix/vida útil/umidade), o LED RGB, o buzzer e o monitor serial.
+5. Pressione `*` para cancelar e voltar ao estado inicial.
 
-Antes de iniciar a simulação do ESP32, é possível verificar a integração entre o backend e o dashboard utilizando o simulador de leituras disponível na própria interface.
+Exemplo com **Banana** (tecla `1`), cujos limiares são 45%, 80% e 92% de maturação:
 
-1. No Dashboard, localize a opção de simulação de leitura.
-2. Escolha uma fruta.
-3. Selecione um estágio de maturação.
-4. Envie a leitura.
-5. Observe a atualização dos indicadores, do gráfico espectral e do histórico.
+| Posição do potenciômetro (aprox.) | Estágio | Estado | LED | Buzzer |
+|---|---|---|---|---|
+| Abaixo de 45% | Imaturo / Verde | ATENÇÃO | Amarelo | Desligado |
+| Entre 45% e 80% | Maduro / Ideal | NORMAL | Verde | Desligado |
+| Entre 80% e 92% | Muito Maduro | ATENÇÃO | Amarelo | Desligado |
+| Acima de 92% | Passado / Deteriorado | CRÍTICO | Vermelho | Pulsante |
 
-Essa etapa permite validar o recebimento, a persistência e a apresentação dos dados pela API, independentemente da conexão com o ESP32.
+### 7.9. Etapa 6: Integração ESP32 e backend
 
-### 7.7. Passo 6 — Executar a simulação do ESP32 no Wokwi
+A cada 4 segundos, depois de uma fruta confirmada com `#`, o firmware envia um `POST` com a leitura em JSON para `http://host.wokwi.internal:8000/readings`, usando o cabeçalho `x-api-key`. O endereço `host.wokwi.internal` aponta para o computador que executa o Wokwi e depende do **Wokwi IoT Gateway**, recurso que, conforme a documentação do Wokwi, pode exigir um plano com acesso ao gateway. A rede Wi-Fi simulada é a `Wokwi-GUEST`.
 
-Com o projeto aberto no Visual Studio Code:
+**Resultado esperado:** o monitor serial mostra `[HTTP] Sucesso no envio ao Backend!` com o código HTTP, e o dashboard passa a exibir leituras do dispositivo `ESP32-FRESHFRUIT-01`.
 
-1. Abra o arquivo `diagram.json`.
-2. Certifique-se de que os arquivos de firmware indicados no `wokwi.toml` estejam disponíveis:
-   - `sketch.ino.bin`
-   - `sketch.ino.elf`
-3. Pressione `F1` ou `Ctrl + Shift + P`.
-4. Procure o comando **Wokwi: Start Simulator**.
-5. Inicie a simulação.
-6. Abra o monitor serial para acompanhar as mensagens do ESP32.
+Se o backend estiver inacessível, o monitor serial mostra `[HTTP] Backend inacessivel ou erro de conexao`, mas o ESP32 **continua funcionando de forma autônoma** (classificação, LCD, LED e buzzer), como prevê a abordagem de Edge Computing. Nesse caso, a integração da API e do dashboard continua demonstrável pelo simulador da etapa 3. Leituras do simulador web (`SIMULADOR-WEB-01`) não devem ser confundidas com medições enviadas pelo dispositivo.
 
-O simulador deverá carregar o circuito com ESP32, teclado matricial, potenciômetro, display LCD, LED RGB e buzzer.
+### 7.10. Solução de problemas
 
-### 7.8. Passo 7 — Realizar os testes de maturação
+| Sintoma | Causa provável | Solução |
+|---|---|---|
+| `ImportError: attempted relative import with no known parent package` | Uvicorn executado dentro de `backend/` | Voltar à raiz e usar `python -m uvicorn backend.main:app ...` |
+| `Address already in use` na porta 8000 | Outro processo usa a porta | Encerrar o processo ou usar outra porta, ajustando `API_BASE_URL` (dashboard) e `BACKEND_URL` (firmware) |
+| Dashboard mostra "Backend desconectado" | Backend parado ou em outra porta | Conferir a etapa 1 e abrir `/health` no navegador |
+| `Wokwi: firmware binary ... not found in workspace` | Caminho do `wokwi.toml` errado ou binário não gerado | Conferir se o arquivo existe no caminho indicado, relativo à pasta do `wokwi.toml`, e se o VS Code abriu a raiz do projeto |
+| Simulação reinicia sem parar (`rst:0x3 (SW_RESET)` repetido no serial) | Binário sem bootloader | Usar `sketch.ino.merged.bin` no `wokwi.toml` e placa **ESP32 Dev Module** na exportação |
+| Erro de compilação por biblioteca ausente | Bibliotecas não instaladas no Arduino IDE | Instalar `LiquidCrystal I2C`, `Keypad` e `ArduinoJson` |
+| `[HTTP] Backend inacessivel` no serial | Backend desligado ou gateway do Wokwi indisponível | Confirmar a etapa 1 e validar a API pelo simulador do dashboard (etapa 3) |
+| `[WIFI] Aviso: Wi-Fi offline` na inicialização | Conexão demorou mais que o tempo de espera | Comportamento previsto: o ESP32 segue autônomo |
 
-Com a simulação em execução:
+### 7.11. Encerramento
 
-1. Pressione uma tecla de `1` a `7` para selecionar uma fruta.
-2. Pressione `#` para confirmar a seleção.
-3. Gire o potenciômetro para modificar o valor de entrada utilizado na simulação espectral.
-4. Observe as mudanças nos indicadores apresentados no LCD.
-5. Verifique as respostas do LED RGB e do buzzer.
-6. Acompanhe as informações e os estados registrados no monitor serial.
-
-Exemplo de seleção:
-
-| Tecla | Fruta |
-|---|---|
-| 1 | Banana |
-| 2 | Manga |
-| 3 | Mamão |
-| 4 | Maçã |
-| 5 | Uva |
-| 6 | Laranja |
-| 7 | Abacate |
-
-A tecla `*` cancela a seleção e retorna o dispositivo ao estado inicial.
-
-### 7.9. Integração e conectividade
-
-O ESP32 foi programado para tentar transmitir as leituras ao backend por HTTP, utilizando o endereço configurado no firmware.
-
-Quando a conexão está disponível, as informações podem ser enviadas à API e armazenadas no banco SQLite.
-
-Caso a conexão Wi-Fi ou a comunicação com o backend não esteja disponível, o dispositivo mantém seu processamento local, incluindo a classificação da maturação e os alertas visuais e sonoros.
-
-**Observação:** o simulador de leituras do Dashboard permite testar a API e a interface separadamente da transmissão do ESP32. Portanto, uma leitura gerada pelo simulador web não deve ser confundida com uma medição recebida diretamente do dispositivo.
-
-### 7.10. Encerramento
-
-Para finalizar os testes:
-
-1. Interrompa a simulação do Wokwi.
-2. Retorne ao terminal do backend.
-3. Pressione `Ctrl + C` para encerrar o servidor FastAPI.
-
+1. Pare a simulação do Wokwi (`F1` e **Wokwi: Stop Simulator**).
+2. Em cada terminal aberto (backend e dashboard), pressione `Ctrl + C`.
 
 ---
 
@@ -311,6 +331,7 @@ FreshFruit/
 ├── dashboard/
 │   ├── index.html               # Estrutura do dashboard web
 │   ├── styles.css               # Folha de estilos moderna e responsiva
+│   ├── fruits.js                # Lógica do desenho das frutas no dashboard
 │   └── app.js                   # Lógica de consumo da API e Chart.js
 └── docs/
     ├── arquitetura.md           # Detalhamento técnico da arquitetura
