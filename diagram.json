@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "author": "Equipe Fresh Fruit - FIAP Global Solution 2026.2",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot1",
+      "top": -120,
+      "left": -180,
+      "attrs": { "label": "Simulador Espectral (AS7265x)" }
+    },
+    {
+      "type": "wokwi-membrane-keypad",
+      "id": "keypad1",
+      "top": 180,
+      "left": -220,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd1",
+      "top": -140,
+      "left": 180,
+      "attrs": { "pins": "i2c" }
+    },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb1",
+      "top": 120,
+      "left": 220,
+      "attrs": { "common": "cathode" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_red",
+      "top": 200,
+      "left": 180,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_green",
+      "top": 230,
+      "left": 180,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_blue",
+      "top": 260,
+      "left": 180,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 20,
+      "left": 280,
+      "attrs": { "hasLocalSound": "true" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "pot1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pot1:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pot1:SIG", "esp:34", "gold", [ "v0" ] ],
+
+    [ "keypad1:R1", "esp:13", "purple", [ "v0" ] ],
+    [ "keypad1:R2", "esp:14", "purple", [ "v0" ] ],
+    [ "keypad1:R3", "esp:18", "purple", [ "v0" ] ],
+    [ "keypad1:R4", "esp:19", "purple", [ "v0" ] ],
+    [ "keypad1:C1", "esp:25", "cyan", [ "v0" ] ],
+    [ "keypad1:C2", "esp:26", "cyan", [ "v0" ] ],
+    [ "keypad1:C3", "esp:27", "cyan", [ "v0" ] ],
+    [ "keypad1:C4", "esp:32", "cyan", [ "v0" ] ],
+
+    [ "lcd1:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "lcd1:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "lcd1:SDA", "esp:21", "blue", [ "v0" ] ],
+    [ "lcd1:SCL", "esp:22", "yellow", [ "v0" ] ],
+
+    [ "esp:4", "r_red:1", "red", [ "v0" ] ],
+    [ "r_red:2", "rgb1:R", "red", [ "v0" ] ],
+
+    [ "esp:16", "r_green:1", "green", [ "v0" ] ],
+    [ "r_green:2", "rgb1:G", "green", [ "v0" ] ],
+
+    [ "esp:17", "r_blue:1", "blue", [ "v0" ] ],
+    [ "r_blue:2", "rgb1:B", "blue", [ "v0" ] ],
+
+    [ "rgb1:COM", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "bz1:1", "esp:23", "orange", [ "v0" ] ],
+    [ "bz1:2", "esp:GND.1", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

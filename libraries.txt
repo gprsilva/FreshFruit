@@ -1,0 +1,4 @@
+# Bibliotecas Arduino necessarias para o Wokwi e compilacao
+LiquidCrystal I2C
+Keypad
+ArduinoJson
